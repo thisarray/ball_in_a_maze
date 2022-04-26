@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ball in a maze</title>
+  <script src="../jsgame0.js"></script>
+  <style type="text/css" media="screen">
+body {
+  background-color: white;
+  color: black;
+}
+.hidden {
+  display: none;
+}
+#original {
+  margin-left: 1em;
+}
+  </style>
+</head>
+
+<body>
+
+<main>
+<h1>ball in a maze</h1>
+
+<canvas id="screen">
+The game screen appears here if your browser supports the Canvas API.
+</canvas>
+<section id="controls">
+  <button type="button" id="reset">Reset</button>
+  <button type="button" id="pause">Pause</button>
+</section>
+
+<p>Use the arrow keys to roll the ball in the corresponding direction.
+<br>The ball stops when it hits a wall.</p>
+
+<p>As a result, some mazes are impossible to complete because the opening is in the middle.</p>
+
+</main>
+
+<script>
+WIDTH = 800;
+HEIGHT = 600;
+
+/*
+ * Integer radius of the ball in pixels.
+ */
+const BALL_RADIUS = 25;
+
+/*
+ * Integer diameter of the ball in pixels.
+ */
+const BALL_DIAMETER = BALL_RADIUS * 2;
+
+/*
+ * Integer number of columns in the maze.
+ */
+const COLUMN_COUNT = Math.floor(WIDTH / BALL_DIAMETER);
+
+/*
+ * Integer number of rows in the maze.
+ */
+const ROW_COUNT = Math.floor(HEIGHT / BALL_DIAMETER);
+
+/*
+ * String label for the top wall.
+ */
+const TOP_WALL = '_top';
+
+/*
+ * String label for the right wall.
+ */
+const RIGHT_WALL = '_right';
+
+/*
+ * String label for the bottom wall.
+ */
+const BOTTOM_WALL = '_bottom';
+
+/*
+ * String label for the left wall.
+ */
+const LEFT_WALL = '_left';
+
+/*
+ * Integer coordinates of the starting cell in the maze.
+ */
+const ORIGIN = [0, 0];
+
+/*
+ * Integer coordinates of the ending cell in the maze.
+ */
+const DESTINATION = [COLUMN_COUNT - 1, ROW_COUNT - 1];
+
+/*
+ * Return a random integer N such that min <= N < max.
+ */
+function getRandomInteger(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor((Math.random() * (max - min)) + min);
+}
+
+/*
+ * Return a Set of walls of a COLUMN_COUNT by ROW_COUNT maze
+ * starting at ORIGIN and ending at DESTINATION.
+ */
+function generateMaze() {
+  let walls = new Set(),
+      unvisited = new Set(),
+      notFullyExplored = new Set(),
+      current = ORIGIN,
+      neighbors, next;
+
+  for (let x = 0; x < COLUMN_COUNT; x++) {
+    for (let y = 0; y < ROW_COUNT; y++) {
+      unvisited.add([x, y].join('x'));
+      walls.add([x, y].join('x') + TOP_WALL);
+      walls.add([x, y].join('x') + RIGHT_WALL);
+      walls.add([x, y].join('x') + BOTTOM_WALL);
+      walls.add([x, y].join('x') + LEFT_WALL);
+    }
+  }
+
+  // Use Prim's Algorithm to find a minimal spanning tree.
+  // That is, find a path that connects all the cells.
+  while (unvisited.size > 0) {
+    unvisited.delete(current.join('x'));
+
+    neighbors = [[current[0] - 1, current[1]],
+                 [current[0] + 1, current[1]],
+                 [current[0], current[1] - 1],
+                 [current[0], current[1] + 1]];
+    // Filter for neighbors within the screen
+    neighbors = neighbors.filter((n) => ((0 <= n[0]) && (n[0] < COLUMN_COUNT) && (0 <= n[1]) && (n[1] < ROW_COUNT)));
+    // Filter for unvisited neighbors
+    neighbors = neighbors.filter((n) => unvisited.has(n.join('x')));
+
+    if (neighbors.length > 1) {
+      notFullyExplored.add(current.join('x'));
+      next = neighbors[getRandomInteger(0, neighbors.length)];
+    }
+    else if (neighbors.length === 1) {
+      next = neighbors[0];
+    }
+    else {
+      current = Array.from(notFullyExplored.values()).pop();
+      current = current.split('x').map((s) => parseInt(s, 10));
+      notFullyExplored.delete(current.join('x'));
+      continue;
+    }
+
+    // Connect current and next cells by removing the walls
+    if (current[0] === next[0]) {
+      if (current[1] < next[1]) {
+        // If current is above next
+        walls.delete(current.join('x') + BOTTOM_WALL);
+        walls.delete(next.join('x') + TOP_WALL);
+      }
+      else {
+        // If current is below next
+        walls.delete(current.join('x') + TOP_WALL);
+        walls.delete(next.join('x') + BOTTOM_WALL);
+      }
+    }
+    else if (current[0] < next[0]) {
+      // If current is to the left of next
+      walls.delete(current.join('x') + RIGHT_WALL);
+      walls.delete(next.join('x') + LEFT_WALL);
+    }
+    else {
+      // If current is to the right of next
+      walls.delete(current.join('x') + LEFT_WALL);
+      walls.delete(next.join('x') + RIGHT_WALL);
+    }
+    current = next;
+  }
+
+  return walls;
+}
+
+var animation, ball, maze, walls;
+
+function reset() {
+  animation = null;
+  ball = ORIGIN.slice();
+  maze = null;
+  walls = generateMaze();
+}
+
+function moveBall(direction) {
+  let next = ball.slice(),
+      duration;
+  while (true) {
+    if (walls.has(next.join('x') + direction)) {
+      break;
+    }
+    if (direction === TOP_WALL) {
+      next[1] -= 1;
+    }
+    else if (direction === RIGHT_WALL) {
+      next[0] += 1;
+    }
+    else if (direction === BOTTOM_WALL) {
+      next[1] += 1;
+    }
+    else if (direction === LEFT_WALL) {
+      next[0] -= 1;
+    }
+  }
+  if ((next[0] !== ball[0]) || (next[1] !== ball[1])) {
+    duration = Math.abs(next[0] - ball[0]) + Math.abs(next[1] - ball[1]);
+    duration *= 0.25;
+    animation = animate(ball, duration, next, 'bounce_end');
+  }
+}
+
+function draw() {
+  if (maze == null) {
+    // Draw the maze the first time and reuse the Surface
+    screen.clear('white');
+    let cell;
+    for (let x = 0; x < COLUMN_COUNT; x++) {
+      for (let y = 0; y < ROW_COUNT; y++) {
+        cell = new Rect(x * BALL_DIAMETER, y * BALL_DIAMETER, BALL_DIAMETER, BALL_DIAMETER);
+        if (walls.has([x, y].join('x') + TOP_WALL)) {
+          screen.draw.line(cell.topleft, cell.topright, 'black');
+        }
+        if (walls.has([x, y].join('x') + RIGHT_WALL)) {
+          screen.draw.line(cell.topright, cell.bottomright, 'black');
+        }
+        if (walls.has([x, y].join('x') + BOTTOM_WALL)) {
+          screen.draw.line(cell.bottomleft, cell.bottomright, 'black');
+        }
+        if (walls.has([x, y].join('x') + LEFT_WALL)) {
+          screen.draw.line(cell.topleft, cell.bottomleft, 'black');
+        }
+        if ((x === DESTINATION[0]) && (y === DESTINATION[1])) {
+          screen.draw.filled_circle([(x * BALL_DIAMETER) + BALL_RADIUS, (y * BALL_DIAMETER) + BALL_RADIUS], BALL_RADIUS, 'black');
+        }
+      }
+    }
+    maze = screen.getSurface();
+  }
+  else {
+    screen.blit(maze, [0, 0]);
+  }
+
+  screen.draw.filled_circle([(ball[0] * BALL_DIAMETER) + BALL_RADIUS, (ball[1] * BALL_DIAMETER) + BALL_RADIUS], BALL_RADIUS, 'gray');
+
+  if ((ball[0] === DESTINATION[0]) && (ball[1] === DESTINATION[1])) {
+    screen.draw.text('SUCCESS!', {
+      center: [Math.floor(WIDTH / 2), Math.floor(HEIGHT / 2)],
+      color: 'yellow',
+      fontsize: BALL_DIAMETER
+    });
+  }
+}
+
+function on_key_down(key, mask, string) {
+  if ((animation != null) && (!animation.done)) {
+    // Ignore key presses during the animation
+    return;
+  }
+
+  if (key === keys.UP) {
+    moveBall(TOP_WALL);
+  }
+  else if (key === keys.RIGHT) {
+    moveBall(RIGHT_WALL);
+  }
+  else if (key === keys.DOWN) {
+    moveBall(BOTTOM_WALL);
+  }
+  else if (key === keys.LEFT) {
+    moveBall(LEFT_WALL);
+  }
+}
+
+window.addEventListener('load', (event) => {
+  reset();
+  screen.set_mode('#screen', '#reset', '#pause');
+});
+</script>
+</body>
+
+</html>
