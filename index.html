@@ -283,6 +283,36 @@ window.addEventListener('load', (event) => {
   reset();
   screen.set_mode('#screen', '#reset', '#pause');
 });
+
+if (window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientation', (event) => {
+    let tiltAboutX = Math.min(Math.max(-90, event.beta), 90),
+        tiltAboutY = event.gamma;
+    console.log(tiltAboutX, tiltAboutY);
+
+    if ((animation != null) && (!animation.done)) {
+      // Ignore tilts during the animation
+      return;
+    }
+
+    if (Math.abs(tiltAboutX) > Math.abs(tiltAboutY)) {
+      if (tiltAboutX < -30) {
+        moveBall(TOP_WALL);
+      }
+      else if (tiltAboutX > 30) {
+        moveBall(BOTTOM_WALL);
+      }
+    }
+    else {
+      if (tiltAboutY < -30) {
+        moveBall(LEFT_WALL);
+      }
+      else if (tiltAboutY > 30) {
+        moveBall(RIGHT_WALL);
+      }
+    }
+  });
+}
 </script>
 </body>
 
