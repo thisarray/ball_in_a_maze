@@ -181,16 +181,32 @@ function generateMaze() {
   return walls;
 }
 
-var animation, ball, maze, walls;
+var animation, ball, complete, maze, walls;
 
 function reset() {
   animation = null;
   ball = ORIGIN.slice();
+  complete = false;
   maze = null;
   walls = generateMaze();
 }
 
+function stopRoll() {
+  if ((ball[0] === DESTINATION[0]) && (ball[1] === DESTINATION[1])) {
+    complete = true;
+    window.navigator.vibrate(300);
+  }
+}
+
 function moveBall(direction) {
+  if ((animation != null) && (!animation.done)) {
+    // Ignore ball movements during the animation
+    return;
+  }
+  if (complete) {
+    return;
+  }
+
   let next = ball.slice(),
       duration;
   while (true) {
@@ -213,7 +229,7 @@ function moveBall(direction) {
   if ((next[0] !== ball[0]) || (next[1] !== ball[1])) {
     duration = Math.abs(next[0] - ball[0]) + Math.abs(next[1] - ball[1]);
     duration *= 0.25;
-    animation = animate(ball, duration, next, 'bounce_end');
+    animation = animate(ball, duration, next, 'bounce_end', stopRoll);
   }
 }
 
@@ -250,21 +266,16 @@ function draw() {
 
   screen.draw.filled_circle([(ball[0] * BALL_DIAMETER) + BALL_RADIUS, (ball[1] * BALL_DIAMETER) + BALL_RADIUS], BALL_RADIUS, 'gray');
 
-  if ((ball[0] === DESTINATION[0]) && (ball[1] === DESTINATION[1])) {
+  if (complete) {
     screen.draw.text('SUCCESS!', {
       center: [Math.floor(WIDTH / 2), Math.floor(HEIGHT / 2)],
-      color: 'yellow',
+      color: 'goldenrod',
       fontsize: BALL_DIAMETER
     });
   }
 }
 
 function on_key_down(key, mask, string) {
-  if ((animation != null) && (!animation.done)) {
-    // Ignore key presses during the animation
-    return;
-  }
-
   if (key === keys.UP) {
     moveBall(TOP_WALL);
   }
@@ -288,13 +299,6 @@ if (window.DeviceOrientationEvent) {
   window.addEventListener('deviceorientation', (event) => {
     let tiltAboutX = Math.min(Math.max(-90, event.beta), 90),
         tiltAboutY = event.gamma;
-    console.log(tiltAboutX, tiltAboutY);
-
-    if ((animation != null) && (!animation.done)) {
-      // Ignore tilts during the animation
-      return;
-    }
-
     if (Math.abs(tiltAboutX) > Math.abs(tiltAboutY)) {
       if (tiltAboutX < -30) {
         moveBall(TOP_WALL);
