@@ -292,8 +292,7 @@ function on_key_down(key, mask, string) {
 }
 
 window.addEventListener('load', (event) => {
-  reset();
-  screen.set_mode('#screen', '#reset', '#pause');
+  screen.init();
 });
 
 if (window.DeviceOrientationEvent) {
